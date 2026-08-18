@@ -3,7 +3,7 @@ spring:
     virtual:
       enabled: true
   config:
-    import: application-locale.properties
+    import: optional:application-locale.properties
   application:
     name: ProductCatalogService
   servlet:
