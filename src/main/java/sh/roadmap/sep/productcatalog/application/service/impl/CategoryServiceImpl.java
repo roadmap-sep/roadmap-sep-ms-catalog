@@ -1,0 +1,102 @@
+package sh.roadmap.sep.productcatalog.application.service.impl;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import sh.roadmap.sep.productcatalog.application.dto.request.CategoryRequest;
+import sh.roadmap.sep.productcatalog.application.dto.response.CategoryResponse;
+import sh.roadmap.sep.productcatalog.application.mapper.CategoryDtoMapper;
+import sh.roadmap.sep.productcatalog.application.service.CategoryService;
+import sh.roadmap.sep.productcatalog.domain.model.Category;
+import sh.roadmap.sep.productcatalog.domain.port.in.CategoryPortIn;
+import sh.roadmap.sep.productcatalog.domain.util.Page;
+
+import java.text.Normalizer;
+import java.util.Locale;
+
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class CategoryServiceImpl implements CategoryService {
+    private final CategoryPortIn categoryPortIn;
+    private final CategoryDtoMapper categoryDtoMapper;
+
+    @Override
+    public Page<CategoryResponse> getAll(Page.Request pageRequest) {
+        return categoryDtoMapper.toDto(categoryPortIn.getAll(pageRequest));
+    }
+
+    @Override
+    public Page<CategoryResponse> getByName(String name, Page.Request pageRequest) {
+        return categoryDtoMapper.toDto(categoryPortIn.getByName(name, pageRequest));
+    }
+
+    @Override
+    public CategoryResponse getById(long categoryId) {
+        return categoryDtoMapper.toDto(categoryPortIn.getById(categoryId));
+    }
+
+    @Override
+    @Transactional
+    public void create(CategoryRequest categoryRequest) {
+        Long parentId = categoryRequest.parentId();
+        if (parentId != null) {
+            categoryPortIn.getById(parentId);
+        }
+        Category category = Category.builder()
+                .name(categoryRequest.name())
+                .slug(generateSlug(categoryRequest))
+                .parentId(parentId)
+                .active(true)
+                .build();
+        categoryPortIn.create(category);
+    }
+
+    @Override
+    @Transactional
+    public void update(CategoryRequest categoryRequest, long categoryId) {
+        Category oldCategory = categoryPortIn.getById(categoryId);
+
+        Long parentId = categoryRequest.parentId();
+        if (parentId != null) {
+            if (parentId == categoryId) {
+                throw new IllegalArgumentException("Una categoría no puede ser padre de sí misma");
+            }
+            categoryPortIn.getById(parentId);
+        }
+        boolean hasCustomSlug = categoryRequest.slug() != null && !categoryRequest.slug().isBlank();
+        String finalSlug = hasCustomSlug ? categoryRequest.slug() : oldCategory.slug();
+        Category updatedCategory = oldCategory
+                .toBuilder()
+                .name(categoryRequest.name())
+                .slug(finalSlug)
+                .parentId(parentId)
+                .build();
+        categoryPortIn.update(updatedCategory);
+    }
+
+    @Override
+    @Transactional
+    public void toggleActiveStatus(long categoryId) {
+        Category oldCategory = categoryPortIn.getById(categoryId);
+        Category updatedCategory = oldCategory.toBuilder()
+                .active(!oldCategory.active())
+                .build();
+        categoryPortIn.update(updatedCategory);
+    }
+
+    private String generateSlug(CategoryRequest categoryRequest) {
+        if (categoryRequest.slug() != null && !categoryRequest.slug().isBlank()) {
+            return categoryRequest.slug();
+        }
+        String noWhitespace = categoryRequest.name()
+                .trim()
+                .toLowerCase(Locale.ENGLISH)
+                .replaceAll("\\s+", "-");
+
+        String normalized = Normalizer.normalize(noWhitespace, Normalizer.Form.NFD);
+
+        String cleanSlug = normalized.replaceAll("[^\\w-]", "");
+        return cleanSlug.replaceAll("(^-|-$)", "");
+    }
+}

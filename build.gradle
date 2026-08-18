@@ -1,0 +1,126 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '4.1.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+	id 'checkstyle'
+	id 'jacoco'
+}
+
+group = 'sh.roadmap.sep'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+ext {
+	set('springCloudVersion', "2025.1.2")
+}
+
+dependencies {
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	//implementation 'org.springframework.boot:spring-boot-starter-security'
+	//implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+	//implementation 'org.springframework.cloud:spring-cloud-starter-consul-discovery'
+	//implementation 'com.opencsv:opencsv:5.12.0'
+	implementation 'com.alibaba:easyexcel:4.0.3'
+	implementation 'org.odftoolkit:odfdom-java:0.13.0'
+	implementation 'org.mapstruct:mapstruct:1.6.3'
+	compileOnly 'org.projectlombok:lombok'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	annotationProcessor 'org.projectlombok:lombok'
+	annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+	//testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test'
+	//testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-validation-test'
+	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+	testCompileOnly 'org.projectlombok:lombok'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+	}
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+	ignoreFailures = false
+	finalizedBy jacocoTestReport
+}
+
+checkstyle {
+	toolVersion = '10.26.1'
+	ignoreFailures = false
+	showViolations = true
+}
+
+configurations.configureEach {
+	resolutionStrategy {
+		force 'org.apache.poi:poi:5.4.0', 'org.apache.poi:poi-ooxml:5.4.0'
+	}
+}
+jacocoTestReport {
+	dependsOn tasks.named('test')
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: [
+						'sh/roadmap/sep/productcatalog/domain/model/**',
+						'sh/roadmap/sep/productcatalog/domain/util/**',
+						'sh/roadmap/sep/productcatalog/domain/exception/**',
+						'sh/roadmap/sep/productcatalog/application/dto/**',
+						'sh/roadmap/sep/productcatalog/application/exception/**',
+						'sh/roadmap/sep/productcatalog/application/mapper/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/configuration/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/entity/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/mapper/**',
+						'sh/roadmap/sep/productcatalog/ProductCatalogServiceApplication.class'
+				])
+			})
+	)
+	reports {
+		xml.required.set(true)
+		html.required.set(true)
+	}
+}
+jacocoTestCoverageVerification {
+	classDirectories.setFrom(
+			files(classDirectories.files.collect {
+				fileTree(dir: it, exclude: [
+						'sh/roadmap/sep/productcatalog/domain/model/**',
+						'sh/roadmap/sep/productcatalog/domain/util/**',
+						'sh/roadmap/sep/productcatalog/domain/exception/**',
+						'sh/roadmap/sep/productcatalog/application/dto/**',
+						'sh/roadmap/sep/productcatalog/application/exception/**',
+						'sh/roadmap/sep/productcatalog/application/mapper/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/configuration/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/entity/**',
+						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/mapper/**',
+						'sh/roadmap/sep/productcatalog/ProductCatalogServiceApplication.class'
+				])
+			})
+	)
+	violationRules {
+		rule {
+			element = 'BUNDLE'
+
+			limit {
+				counter = 'LINE'
+				value = 'COVEREDRATIO'
+				minimum = 0.80
+			}
+		}
+	}
+}
+check.dependsOn jacocoTestCoverageVerification
