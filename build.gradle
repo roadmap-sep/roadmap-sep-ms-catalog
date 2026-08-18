@@ -76,16 +76,16 @@ jacocoTestReport {
 	classDirectories.setFrom(
 			files(classDirectories.files.collect {
 				fileTree(dir: it, exclude: [
-						'sh/roadmap/sep/productcatalog/domain/model/**',
-						'sh/roadmap/sep/productcatalog/domain/util/**',
-						'sh/roadmap/sep/productcatalog/domain/exception/**',
-						'sh/roadmap/sep/productcatalog/application/dto/**',
-						'sh/roadmap/sep/productcatalog/application/exception/**',
-						'sh/roadmap/sep/productcatalog/application/mapper/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/configuration/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/entity/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/mapper/**',
-						'sh/roadmap/sep/productcatalog/ProductCatalogServiceApplication.class'
+						'sh/roadmap/sep/catalog/domain/model/**',
+						'sh/roadmap/sep/catalog/domain/util/**',
+						'sh/roadmap/sep/catalog/domain/exception/**',
+						'sh/roadmap/sep/catalog/application/dto/**',
+						'sh/roadmap/sep/catalog/application/exception/**',
+						'sh/roadmap/sep/catalog/application/mapper/**',
+						'sh/roadmap/sep/catalog/infrastructure/configuration/**',
+						'sh/roadmap/sep/catalog/infrastructure/output/jpa/entity/**',
+						'sh/roadmap/sep/catalog/infrastructure/output/jpa/mapper/**',
+						'sh/roadmap/sep/catalog/CatalogServiceApplication.class'
 				])
 			})
 	)
@@ -98,16 +98,16 @@ jacocoTestCoverageVerification {
 	classDirectories.setFrom(
 			files(classDirectories.files.collect {
 				fileTree(dir: it, exclude: [
-						'sh/roadmap/sep/productcatalog/domain/model/**',
-						'sh/roadmap/sep/productcatalog/domain/util/**',
-						'sh/roadmap/sep/productcatalog/domain/exception/**',
-						'sh/roadmap/sep/productcatalog/application/dto/**',
-						'sh/roadmap/sep/productcatalog/application/exception/**',
-						'sh/roadmap/sep/productcatalog/application/mapper/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/configuration/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/entity/**',
-						'sh/roadmap/sep/productcatalog/infrastructure/output/jpa/mapper/**',
-						'sh/roadmap/sep/productcatalog/ProductCatalogServiceApplication.class'
+						'sh/roadmap/sep/catalog/domain/model/**',
+						'sh/roadmap/sep/catalog/domain/util/**',
+						'sh/roadmap/sep/catalog/domain/exception/**',
+						'sh/roadmap/sep/catalog/application/dto/**',
+						'sh/roadmap/sep/catalog/application/exception/**',
+						'sh/roadmap/sep/catalog/application/mapper/**',
+						'sh/roadmap/sep/catalog/infrastructure/configuration/**',
+						'sh/roadmap/sep/catalog/infrastructure/output/jpa/entity/**',
+						'sh/roadmap/sep/catalog/infrastructure/output/jpa/mapper/**',
+						'sh/roadmap/sep/catalog/CatalogServiceApplication.class'
 				])
 			})
 	)
