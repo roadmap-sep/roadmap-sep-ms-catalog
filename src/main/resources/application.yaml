@@ -23,7 +23,7 @@ spring:
     driver-class-name: ${DATASOURCE_DRIVER}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO}
     show-sql: false
 
 server:
