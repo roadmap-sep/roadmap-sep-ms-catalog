@@ -45,8 +45,16 @@ jobs:
       - name: Run Checkstyle
         run: ./gradlew checkstyleMain checkstyleTest --no-daemon
 
-      # 7. Compilar, ejecutar tests, cobertura y verificación de umbrales
+      # 7. Compilar, ejecutar tests, cobertura y verificación de umbrales (CON LAS VARIABLES DE ENTORNO)
       - name: Build, Test and Coverage Verification
+        env:
+          DATASOURCE_URL: ${{ secrets.DATASOURCE_URL }}
+          DATASOURCE_USERNAME: ${{ secrets.DATASOURCE_USERNAME }}
+          DATASOURCE_PASSWORD: ${{ secrets.DATASOURCE_PASSWORD }}
+          DATASOURCE_DRIVER: ${{ secrets.DATASOURCE_DRIVER }}
+          SPRING_JPA_HIBERNATE_DDL_AUTO: ${{ secrets.SPRING_JPA_HIBERNATE_DDL_AUTO }}
+          MULTIPART_MAX_FILE_SIZE: "2MB"
+          MULTIPART_MAX_REQUEST_SIZE: "2MB"
         run: ./gradlew build check --no-daemon
 
       # 8. Subir el reporte de cobertura de JaCoCo
