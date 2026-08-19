@@ -1,6 +1,7 @@
 package sh.roadmap.sep.catalog.domain.usecase;
 
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.port.in.CategoryPortIn;
 import sh.roadmap.sep.catalog.domain.port.out.CategoryPortOut;
 import sh.roadmap.sep.catalog.domain.util.Page;
@@ -13,13 +14,8 @@ public class CategoryUseCase implements CategoryPortIn {
     }
 
     @Override
-    public Page<Category> getAll(Page.Request pageRequest) {
-        return categoryPortOut.getAll(pageRequest);
-    }
-
-    @Override
-    public Page<Category> getByName(String name, Page.Request pageRequest) {
-        return categoryPortOut.getByName(name, pageRequest);
+    public Page<Category> searchCategories(CategoryFilter categoryFilter, Page.Request pageRequest) {
+        return categoryPortOut.searchCategories(categoryFilter, pageRequest);
     }
 
     @Override

@@ -4,15 +4,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import sh.roadmap.sep.catalog.domain.exception.CategoryAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.exception.CategoryNotFoundException;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.entity.CategoryEntity;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.mapper.CategoryJpaMapper;
@@ -24,6 +27,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.never;
@@ -47,19 +51,21 @@ class CategoryJpaAdapterTest {
     private final Page.Request pageRequest = new Page.Request(0, 10);
 
     @Nested
-    @DisplayName("Tests for getAll()")
-    class GetAllTests {
+    @DisplayName("Tests for searchCategories()")
+    class SearchCategoriesTests {
 
         @Test
-        @DisplayName("should return a mapped category page")
-        void shouldReturnMappedCategoryPage() {
+        @DisplayName("should return a mapped category page when searching with dynamic filters")
+        void shouldReturnMappedCategoryPageWhenSearching() {
+            var filter = new CategoryFilter("Electronics", "electronics-slug", null, true);
             var pageable = PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize());
             var entityPage = new PageImpl<>(List.of(categoryEntity), pageable, 1);
 
-            given(categoryJpaRepository.findAll(pageable)).willReturn(entityPage);
+            given(categoryJpaRepository.findAll(ArgumentMatchers.<Specification<CategoryEntity>>any(),
+                    eq(pageable))).willReturn(entityPage);
             given(categoryJpaMapper.toModel(categoryEntity)).willReturn(category);
 
-            var result = categoryJpaAdapter.getAll(pageRequest);
+            var result = categoryJpaAdapter.searchCategories(filter, pageRequest);
 
             assertThat(result).isNotNull();
             assertThat(result.data()).containsExactly(category);
@@ -67,30 +73,10 @@ class CategoryJpaAdapterTest {
             assertThat(result.pageNumber()).isZero();
             assertThat(result.pageSize()).isEqualTo(10);
 
-            then(categoryJpaRepository).should().findAll(pageable);
-            then(categoryJpaMapper).should().toModel(categoryEntity);
-        }
-    }
-
-    @Nested
-    @DisplayName("Tests for getByName()")
-    class GetByNameTests {
-
-        @Test
-        @DisplayName("should return a mapped page filtered by name")
-        void shouldReturnMappedCategoryPageByName() {
-            String nameToSearch = "elec";
-            var pageable = PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize());
-            var entityPage = new PageImpl<>(List.of(categoryEntity), pageable, 1);
-
-            given(categoryJpaRepository.findByNameContainingIgnoreCase(nameToSearch, pageable))
-                    .willReturn(entityPage);
-            given(categoryJpaMapper.toModel(categoryEntity)).willReturn(category);
-
-            var result = categoryJpaAdapter.getByName(nameToSearch, pageRequest);
-
-            assertThat(result.data()).containsExactly(category);
-            then(categoryJpaRepository).should().findByNameContainingIgnoreCase(nameToSearch, pageable);
+            then(categoryJpaRepository).should()
+                    .findAll(ArgumentMatchers.<Specification<CategoryEntity>>any(), eq(pageable));
+            then(categoryJpaMapper).should()
+                    .toModel(categoryEntity);
         }
     }
 

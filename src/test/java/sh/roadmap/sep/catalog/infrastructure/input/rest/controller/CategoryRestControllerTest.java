@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import tools.jackson.databind.ObjectMapper;
 
@@ -50,11 +51,12 @@ class CategoryRestControllerTest {
 
     @Nested
     @DisplayName("GET " + BASE_URL)
-    class GetAllTests {
+    class SearchCategoriesTests {
 
         @Test
-        @DisplayName("Should return 200 OK and paged categories when requesting all categories")
-        void shouldReturnPagedCategories() throws Exception {
+        @DisplayName("Should return 200 OK and paged categories using default parameters when no filters are provided")
+        void shouldReturnPagedCategoriesWithDefaultFilters() throws Exception {
+            var defaultFilter = new CategoryFilter(null, null, null, true);
             var pageRequest = new Page.Request(0, 10);
             var categoryPage = Page.<CategoryResponse>builder()
                     .data(List.of(categoryResponse))
@@ -65,11 +67,9 @@ class CategoryRestControllerTest {
                     .hasNext(false)
                     .build();
 
-            given(categoryService.getAll(pageRequest)).willReturn(categoryPage);
+            given(categoryService.searchCategories(defaultFilter, pageRequest)).willReturn(categoryPage);
 
             mockMvc.perform(get(BASE_URL)
-                            .param("page", "0")
-                            .param("size", "10")
                             .accept(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data[0].id").value(1))
@@ -80,40 +80,47 @@ class CategoryRestControllerTest {
                     .andExpect(jsonPath("$.pageSize").value(10))
                     .andExpect(jsonPath("$.totalElements").value(1));
 
-            then(categoryService).should().getAll(pageRequest);
+            then(categoryService).should().searchCategories(defaultFilter, pageRequest);
         }
-    }
-
-    @Nested
-    @DisplayName("GET " + BASE_URL + "?category_name={name}")
-    class GetByNameTests {
 
         @Test
-        @DisplayName("Should return 200 OK and filtered categories when category_name param is provided")
-        void shouldReturnFilteredCategories() throws Exception {
-            String categoryName = "Elec";
-            var pageRequest = new Page.Request(0, 10);
+        @DisplayName("Should return 200 OK and filtered categories when query parameters are provided")
+        void shouldReturnFilteredCategoriesWhenQueryParamsAreProvided() throws Exception {
+            String name = "Elec";
+            String slug = "electronics";
+            Long parentId = 2L;
+            Boolean isActive = false;
+            int page = 1;
+            int size = 5;
+
+            var filter = new CategoryFilter(name, slug, parentId, isActive);
+            var pageRequest = new Page.Request(page, size);
             var categoryPage = Page.<CategoryResponse>builder()
                     .data(List.of(categoryResponse))
-                    .pageNumber(0)
-                    .pageSize(10)
+                    .pageNumber(page)
+                    .pageSize(size)
                     .totalElements(1)
                     .totalPages(1)
                     .hasNext(false)
                     .build();
 
-            given(categoryService.getByName(categoryName, pageRequest)).willReturn(categoryPage);
+            given(categoryService.searchCategories(filter, pageRequest)).willReturn(categoryPage);
 
             mockMvc.perform(get(BASE_URL)
-                            .param("category_name", categoryName)
-                            .param("page", "0")
-                            .param("size", "10")
+                            .param("name", name)
+                            .param("slug", slug)
+                            .param("parent_id", String.valueOf(parentId))
+                            .param("is_active", String.valueOf(isActive))
+                            .param("page", String.valueOf(page))
+                            .param("size", String.valueOf(size))
                             .accept(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.data[0].id").value(1))
-                    .andExpect(jsonPath("$.data[0].name").value("Electronics"));
+                    .andExpect(jsonPath("$.data[0].name").value("Electronics"))
+                    .andExpect(jsonPath("$.pageNumber").value(1))
+                    .andExpect(jsonPath("$.pageSize").value(5));
 
-            then(categoryService).should().getByName(categoryName, pageRequest);
+            then(categoryService).should().searchCategories(filter, pageRequest);
         }
     }
 

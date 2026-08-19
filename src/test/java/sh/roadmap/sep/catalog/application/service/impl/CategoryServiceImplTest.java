@@ -13,6 +13,7 @@ import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
 import sh.roadmap.sep.catalog.application.mapper.CategoryDtoMapper;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.port.in.CategoryPortIn;
 import sh.roadmap.sep.catalog.domain.util.Page;
 
@@ -47,43 +48,24 @@ class CategoryServiceImplTest {
             "electronics", null, true);
 
     @Nested
-    @DisplayName("getAll() tests")
-    class GetAllTests {
+    @DisplayName("searchCategories() tests")
+    class SearchCategoriesTests {
 
         @Test
-        @DisplayName("Should return a mapped page of all categories")
-        void shouldReturnAllCategories() {
+        @DisplayName("Should delegate category search to port and map results to DTO page")
+        void shouldReturnMappedCategoriesByFilter() {
+            var filter = new CategoryFilter("Elec", "electronics", null, true);
             var categoryPage = Page.<Category>builder().data(List.of(category)).build();
             var responsePage = Page.<CategoryResponse>builder().data(List.of(categoryResponse)).build();
 
-            given(categoryPortIn.getAll(pageRequest)).willReturn(categoryPage);
+            given(categoryPortIn.searchCategories(filter, pageRequest)).willReturn(categoryPage);
             given(categoryDtoMapper.toDto(categoryPage)).willReturn(responsePage);
 
-            var result = categoryService.getAll(pageRequest);
+            var result = categoryService.searchCategories(filter, pageRequest);
 
             assertThat(result).isEqualTo(responsePage);
-            then(categoryPortIn).should().getAll(pageRequest);
-        }
-    }
-
-    @Nested
-    @DisplayName("getByName() tests")
-    class GetByNameTests {
-
-        @Test
-        @DisplayName("Should return a mapped page of categories filtered by name")
-        void shouldReturnCategoriesByName() {
-            String name = "Elec";
-            var categoryPage = Page.<Category>builder().data(List.of(category)).build();
-            var responsePage = Page.<CategoryResponse>builder().data(List.of(categoryResponse)).build();
-
-            given(categoryPortIn.getByName(name, pageRequest)).willReturn(categoryPage);
-            given(categoryDtoMapper.toDto(categoryPage)).willReturn(responsePage);
-
-            var result = categoryService.getByName(name, pageRequest);
-
-            assertThat(result).isEqualTo(responsePage);
-            then(categoryPortIn).should().getByName(name, pageRequest);
+            then(categoryPortIn).should().searchCategories(filter, pageRequest);
+            then(categoryDtoMapper).should().toDto(categoryPage);
         }
     }
 
