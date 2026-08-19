@@ -8,6 +8,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import sh.roadmap.sep.catalog.application.exception.ProductImportException;
 import sh.roadmap.sep.catalog.domain.exception.ProductAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.exception.ProductNotFoundException;
 import sh.roadmap.sep.catalog.domain.model.Product;
@@ -75,78 +78,33 @@ public class ProductJpaAdapter implements ProductPortOut {
         if (products == null || products.isEmpty()) {
             return;
         }
-
-        String sqlProduct = """
-                  INSERT INTO product (id, sku, name, description, price,\s
-                  main_image_url, stock, weight, active, created_at, updated_at)\s
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\s
-                """;
-
-        jdbcTemplate.batchUpdate(sqlProduct, new BatchPreparedStatementSetter() {
-            @Override
-            public void setValues(@NonNull PreparedStatement ps, int i) throws SQLException {
-                Product product = products.get(i);
-
-                ps.setObject(1, product.id());
-                ps.setString(2, product.sku());
-                ps.setString(3, product.name());
-                ps.setString(4, product.description());
-                ps.setBigDecimal(5, product.price());
-                ps.setString(6, product.mainImageUrl());
-                ps.setInt(7, product.stock());
-                ps.setDouble(8, product.weight());
-                ps.setBoolean(9, product.active());
-                ps.setTimestamp(10, Timestamp.from(product.createdAt()));
-                ps.setTimestamp(11, Timestamp.from(product.updatedAt()));
-            }
-
-            @Override
-            public int getBatchSize() {
-                return products.size();
-            }
-        });
-
-        List<Object[]> productCategoryArgs = new ArrayList<>();
-        for (Product product : products) {
-            if (product.categoryIds() != null) {
-                for (Long categoryId : product.categoryIds()) {
-                    productCategoryArgs.add(new Object[]{product.id(), categoryId});
-                }
-            }
+        try {
+            insertProducts(products);
+        } catch (DataIntegrityViolationException e) {
+            handleDuplicateSkuAndThrow(products, e);
         }
-        if (!productCategoryArgs.isEmpty()) {
-            String sqlCategory = "INSERT INTO product_category (product_id, category_id) VALUES (?, ?)";
-            jdbcTemplate.batchUpdate(sqlCategory, productCategoryArgs);
-        }
+        insertCategoryRelations(products);
     }
 
     @Override
     public void update(Product product) {
-        if (!productJpaRepository.existsById(product.id())) {
-            throw new ProductNotFoundException(product.id());
-        }
         ProductEntity productEntity = productJpaMapper.toEntity(product);
         productEntity.markNotNew();
         productJpaRepository.save(productEntity);
     }
 
     private Page<Product> toProductPage(org.springframework.data.domain.Page<ProductEntity> page) {
-        int pageNumber = page.getNumber();
-        int pageSize = page.getSize();
-        long totalElements = page.getTotalElements();
-        int totalPages = page.getTotalPages();
-        boolean hasNextPage = page.hasNext();
+        Page.PageBuilder<Product> builder = Page.<Product>builder()
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .hasNext(page.hasNext());
+
         return page.get()
                 .map(productJpaMapper::toDomain)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), products ->
-                        Page.<Product>builder()
-                                .data(products)
-                                .pageNumber(pageNumber)
-                                .pageSize(pageSize)
-                                .totalElements(totalElements)
-                                .totalPages(totalPages)
-                                .hasNext(hasNextPage)
-                                .build()));
+                .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
+                .build();
     }
 
     private Specification<ProductEntity> getDynamicFilters(ProductFilter filter) {
@@ -173,5 +131,73 @@ public class ProductJpaAdapter implements ProductPortOut {
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private void insertProducts(List<Product> products) {
+        String sqlProduct = """
+                  INSERT INTO product (id, sku, name, description, price,\s
+                  main_image_url, stock, weight, active, created_at, updated_at)\s
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\s
+                """;
+
+        jdbcTemplate.batchUpdate(sqlProduct, new BatchPreparedStatementSetter() {
+            @Override
+            public void setValues(@NonNull PreparedStatement ps, int i) throws SQLException {
+                Product product = products.get(i);
+                String productId = product.id() != null ? product.id().toString() : null;
+
+                ps.setObject(1, productId);
+                ps.setString(2, product.sku());
+                ps.setString(3, product.name());
+                ps.setString(4, product.description());
+                ps.setBigDecimal(5, product.price());
+                ps.setString(6, product.mainImageUrl());
+                ps.setInt(7, product.stock());
+                ps.setDouble(8, product.weight());
+                ps.setBoolean(9, product.active());
+                ps.setTimestamp(10, Timestamp.from(product.createdAt()));
+                ps.setTimestamp(11, Timestamp.from(product.updatedAt()));
+            }
+
+            @Override
+            public int getBatchSize() {
+                return products.size();
+            }
+        });
+    }
+
+    private void handleDuplicateSkuAndThrow(List<Product> products, DataIntegrityViolationException e) {
+        if (e.getMostSpecificCause().getMessage().contains("sku")) {
+            MapSqlParameterSource parameters = products.stream()
+                    .map(Product::sku)
+                    .collect(Collectors.collectingAndThen(Collectors.toList(),
+                            incomingSkus -> new MapSqlParameterSource("skus", incomingSkus)));
+
+            String sqlCheck = "SELECT sku FROM product WHERE sku IN (:skus)";
+
+            throw new NamedParameterJdbcTemplate(jdbcTemplate)
+                    .queryForList(sqlCheck, parameters, String.class)
+                    .stream()
+                    .collect(Collectors.collectingAndThen(Collectors.toList(), ProductImportException::new));
+        }
+        throw e;
+    }
+
+    private void insertCategoryRelations(List<Product> products) {
+        List<Object[]> productCategoryArgs = new ArrayList<>(products.size() * 2);
+
+        for (Product product : products) {
+            if (product.categoryIds() != null && !product.categoryIds().isEmpty()) {
+                String productId = product.id() != null ? product.id().toString() : null;
+                for (Long categoryId : product.categoryIds()) {
+                    productCategoryArgs.add(new Object[]{productId, categoryId});
+                }
+            }
+        }
+
+        if (!productCategoryArgs.isEmpty()) {
+            String sqlCategory = "INSERT INTO product_category (product_id, category_id) VALUES (?, ?)";
+            jdbcTemplate.batchUpdate(sqlCategory, productCategoryArgs);
+        }
     }
 }

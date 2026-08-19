@@ -63,21 +63,15 @@ public class CategoryJpaAdapter implements CategoryPortOut {
     }
 
     private Page<Category> toCategoryPage(org.springframework.data.domain.Page<CategoryEntity> page) {
-        int pageNumber = page.getNumber();
-        int pageSize = page.getSize();
-        long totalElements = page.getTotalElements();
-        int totalPages = page.getTotalPages();
-        boolean hasNextPage = page.hasNext();
+        Page.PageBuilder<Category> builder = Page.<Category>builder()
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .hasNext(page.hasNext());
         return page.get()
                 .map(categoryJpaMapper::toModel)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), categories ->
-                        Page.<Category>builder()
-                                .data(categories)
-                                .pageNumber(pageNumber)
-                                .pageSize(pageSize)
-                                .totalElements(totalElements)
-                                .totalPages(totalPages)
-                                .hasNext(hasNextPage)
-                                .build()));
+                .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
+                .build();
     }
 }

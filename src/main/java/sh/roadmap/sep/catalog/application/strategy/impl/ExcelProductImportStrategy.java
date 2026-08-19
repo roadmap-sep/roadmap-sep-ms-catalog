@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class ExcelProductImportStrategy implements ProductImportStrategy {
@@ -67,7 +68,12 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
                     .headRowNumber(1)
                     .doRead();
         } catch (Exception e) {
-            violations.add(e.getMessage());
+            if (e instanceof ProductImportException) {
+                throw (ProductImportException) e;
+            }
+            log.error(e.getMessage(), e);
+            violations.add("The information could not be extracted from the file; "
+                    + "please ensure it is in the correct format.");
             throw new ProductImportException(file.fileName(), violations);
         }
         if (productsDto.isEmpty()) {
@@ -108,7 +114,6 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
         private String weight;
     }
 
-    @Slf4j
     @RequiredArgsConstructor
     private static class ProductExcelListener implements ReadListener<ProductExcelDto> {
         private static final String VIOLATION_MESSAGE_TEMPLATE = "Row: %s  { %s }";
@@ -152,11 +157,8 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
                         .weight(validateString(data.getWeight())
                                 ? Double.valueOf(data.getWeight().replaceAll("[^0-9.-]", ""))
                                 : null);
-            } catch (Exception e) {
-                log.error(e.toString());
-                if (e instanceof NumberFormatException) {
-                    violations.add(String.format(VIOLATION_MESSAGE_TEMPLATE, rowNumber, "Invalid numeric format"));
-                }
+            } catch (NumberFormatException e) {
+                violations.add(String.format(VIOLATION_MESSAGE_TEMPLATE, rowNumber, "Invalid numeric format"));
             }
             ProductRequest dto = builder.build();
             validateCategories(dto, rowNumber).ifPresent(violations::add);

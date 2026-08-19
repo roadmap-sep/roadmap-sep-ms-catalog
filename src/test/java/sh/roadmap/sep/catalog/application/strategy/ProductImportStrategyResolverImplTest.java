@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import sh.roadmap.sep.catalog.application.exception.ProductImportStrategyException;
+import sh.roadmap.sep.catalog.application.strategy.impl.ProductImportStrategyResolverImpl;
 
 import java.util.List;
 
