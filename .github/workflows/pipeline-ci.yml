@@ -41,7 +41,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      # 6. Checkstyle (estilo de código)
+      # 6. Checkstyle
       - name: Run Checkstyle
         run: ./gradlew checkstyleMain checkstyleTest --no-daemon
 

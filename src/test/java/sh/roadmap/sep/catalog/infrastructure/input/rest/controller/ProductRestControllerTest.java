@@ -10,14 +10,19 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import sh.roadmap.sep.catalog.application.dto.request.ProductImportRequest;
 import sh.roadmap.sep.catalog.application.dto.request.ProductRequest;
 import sh.roadmap.sep.catalog.application.dto.response.ProductResponse;
 import sh.roadmap.sep.catalog.application.service.ProductService;
+import sh.roadmap.sep.catalog.domain.exception.ProductAlreadyExistsException;
+import sh.roadmap.sep.catalog.domain.exception.ProductNotFoundException;
 import sh.roadmap.sep.catalog.domain.model.ProductFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +34,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -77,6 +83,15 @@ class ProductRestControllerTest {
             .weight(0.25)
             .active(true)
             .build();
+
+    @Test
+    @DisplayName("Should return error when invalid Api version")
+    void shouldReturnErrorWhenInvalidApiVersion() throws Exception {
+        mockMvc.perform(get("/v999.0/products/batch"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail")
+                        .value(org.hamcrest.CoreMatchers.containsString("is not available")));
+    }
 
     @Nested
     @DisplayName("GET " + BASE_URL)
@@ -138,6 +153,18 @@ class ProductRestControllerTest {
                     .andExpect(jsonPath("$.id").value(productId.toString()))
                     .andExpect(jsonPath("$.sku").value("PROD-123"));
         }
+
+        @Test
+        @DisplayName("Should throw ProductNotFoundException when ID not found")
+        void shouldReturnProductNotFoundExceptionWhenIdNotFound() throws Exception {
+            given(productService.getById(productId))
+                    .willThrow(new ProductNotFoundException(productId));
+
+            mockMvc.perform(get(BASE_URL + "/{product_id}", productId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.detail").exists());
+        }
     }
 
     @Nested
@@ -173,6 +200,21 @@ class ProductRestControllerTest {
                     .andExpect(status().isCreated());
 
             then(productService).should().save(validRequest);
+        }
+
+        @Test
+        @DisplayName("Should throw ProductAlreadyExistsException")
+        void shouldReturnProductAlreadyExistsException() throws Exception {
+            ProductRequest validRequest = validRequestBuilder().build();
+
+            doThrow(new ProductAlreadyExistsException(validRequest.sku()))
+                    .when(productService).save(any(ProductRequest.class));
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validRequest)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").exists());
         }
 
         @Test
@@ -264,6 +306,42 @@ class ProductRestControllerTest {
                             result.getResolvedException()));
 
             then(productService).should(never()).saveBatch(any());
+        }
+
+        @Test
+        @DisplayName("Should throw ImportException when IoException occurs")
+        void shouldThrowProductImportExceptionWhenIoExceptionOccurs() throws Exception {
+            MockMultipartFile file = new MockMultipartFile("file", "test.csv",
+                    MediaType.TEXT_PLAIN_VALUE, "dummy content".getBytes()) {
+                @Override
+                public InputStream getInputStream() throws IOException {
+                    throw new IOException("Error simulado de IO");
+                }
+            };
+            mockMvc.perform(multipart(BASE_URL + "/batch")
+                            .file(file))
+                    .andExpect(status().is4xxClientError());
+        }
+
+        @Test
+        @DisplayName("Should return error when max upload size exceeded")
+        void shouldReturnErrorWhenMaxUploadSizeExceeded() throws Exception {
+            byte[] largeContent = new byte[1024 * 1024 * 3];
+
+            MockMultipartFile largeFile = new MockMultipartFile(
+                    "file",
+                    "large-products.csv",
+                    MediaType.TEXT_PLAIN_VALUE,
+                    largeContent
+            );
+
+            doThrow(new MaxUploadSizeExceededException(2097152))
+                    .when(productService).saveBatch(any());
+
+            mockMvc.perform(multipart(BASE_URL + "/batch")
+                            .file(largeFile))
+                    .andExpect(status().is(413))
+                    .andExpect(jsonPath("$.detail").exists());
         }
     }
 

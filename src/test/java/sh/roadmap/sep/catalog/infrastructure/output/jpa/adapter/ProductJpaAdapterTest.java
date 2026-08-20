@@ -35,6 +35,7 @@ import sh.roadmap.sep.catalog.infrastructure.output.jpa.mapper.ProductJpaMapper;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.repository.ProductJpaRepository;
 
 import java.math.BigDecimal;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Collections;
@@ -71,8 +72,12 @@ class ProductJpaAdapterTest {
 
     @Captor
     private ArgumentCaptor<ProductEntity> productEntityCaptor;
+
     @Captor
     private ArgumentCaptor<Specification<ProductEntity>> specificationCaptor;
+
+    @Captor
+    private ArgumentCaptor<BatchPreparedStatementSetter> batchSetterCaptor;
 
     private final UUID productId = UUID.randomUUID();
     private final String sku = "PROD-123";
@@ -232,15 +237,35 @@ class ProductJpaAdapterTest {
         }
 
         @Test
-        @DisplayName("Should execute two batch updates (products and categories) on success")
+        @DisplayName("Should execute two batch updates and map properties correctly in BatchPreparedStatementSetter")
         @SuppressWarnings("unchecked")
-        void shouldSaveBatchSuccessfully() {
+        void shouldSaveBatchSuccessfully() throws SQLException {
             List<Product> products = List.of(product);
 
             productJpaAdapter.saveBatch(products);
 
-            then(jdbcTemplate).should().batchUpdate(anyString(), any(BatchPreparedStatementSetter.class));
+            then(jdbcTemplate).should().batchUpdate(anyString(), batchSetterCaptor.capture());
             then(jdbcTemplate).should().batchUpdate(anyString(), any(List.class));
+
+            BatchPreparedStatementSetter capturedSetter = batchSetterCaptor.getValue();
+
+            assertThat(capturedSetter.getBatchSize()).isEqualTo(1);
+
+            PreparedStatement psMock = mock(PreparedStatement.class);
+            capturedSetter.setValues(psMock, 0); // 0 es el índice del producto en la lista
+
+            then(psMock).should().setObject(1, product.id().toString());
+            then(psMock).should().setString(2, product.sku());
+            then(psMock).should().setString(3, product.name());
+            then(psMock).should().setString(4, product.description());
+            then(psMock).should().setBigDecimal(5, product.price());
+            then(psMock).should().setString(6, product.mainImageUrl());
+            then(psMock).should().setInt(7, product.stock());
+            then(psMock).should().setDouble(8, product.weight());
+            then(psMock).should().setBoolean(9, product.active());
+
+            then(psMock).should().setTimestamp(eq(10), any(java.sql.Timestamp.class));
+            then(psMock).should().setTimestamp(eq(11), any(java.sql.Timestamp.class));
         }
 
         @Test

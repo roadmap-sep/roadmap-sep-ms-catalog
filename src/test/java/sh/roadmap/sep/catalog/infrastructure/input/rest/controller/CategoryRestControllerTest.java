@@ -11,6 +11,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
+import sh.roadmap.sep.catalog.domain.exception.CategoryNotFoundException;
+import sh.roadmap.sep.catalog.domain.exception.ProductAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import tools.jackson.databind.ObjectMapper;
@@ -22,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -144,6 +147,19 @@ class CategoryRestControllerTest {
 
             then(categoryService).should().getById(categoryId);
         }
+
+        @Test
+        @DisplayName("Should throw CategoryNotFoundException when ID not found")
+        void shouldReturnCategoryNotFoundExceptionWhenIdNotFound() throws Exception {
+            long categoryId = 1L;
+            given(categoryService.getById(categoryId))
+                    .willThrow(new CategoryNotFoundException(categoryId));
+
+            mockMvc.perform(get(BASE_URL + "/{product_id}", categoryId)
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.detail").exists());
+        }
     }
 
     @Nested
@@ -161,6 +177,20 @@ class CategoryRestControllerTest {
                     .andExpect(status().isCreated());
 
             then(categoryService).should().create(validRequest);
+        }
+
+        @Test
+        @DisplayName("Should throw ProductAlreadyExistsException")
+        void shouldReturnProductAlreadyExistsException() throws Exception {
+
+            doThrow(new ProductAlreadyExistsException(validRequest.slug()))
+                    .when(categoryService).create(any(CategoryRequest.class));
+
+            mockMvc.perform(post(BASE_URL)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(validRequest)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").exists());
         }
 
         @Test
