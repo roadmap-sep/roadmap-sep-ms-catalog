@@ -1,8 +1,10 @@
-package sh.roadmap.sep.catalog.application.strategy;
+package sh.roadmap.sep.catalog.application.strategy.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import sh.roadmap.sep.catalog.application.exception.ProductImportStrategyException;
+import sh.roadmap.sep.catalog.application.strategy.ProductImportStrategy;
+import sh.roadmap.sep.catalog.application.strategy.ProductImportStrategyResolver;
 
 import java.util.List;
 

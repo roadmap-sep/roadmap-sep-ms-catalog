@@ -8,6 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.port.out.CategoryPortOut;
 import sh.roadmap.sep.catalog.domain.util.Page;
 
@@ -32,12 +33,13 @@ class CategoryUseCaseTest {
     private final Page.Request pageRequest = new Page.Request(0, 10);
 
     @Nested
-    @DisplayName("getAll() tests")
-    class GetAllTests {
+    @DisplayName("searchCategories() tests")
+    class SearchCategoriesTests {
 
         @Test
-        @DisplayName("Should delegate to portOut and return a page of categories")
-        void shouldDelegateGetAll() {
+        @DisplayName("Should delegate category search to portOut and return a page of categories")
+        void shouldDelegateSearchCategories() {
+            var filter = new CategoryFilter("Elec", "electronics", null, true);
             var categoryPage = Page.<Category>builder()
                     .data(List.of(category))
                     .pageNumber(0)
@@ -47,32 +49,13 @@ class CategoryUseCaseTest {
                     .hasNext(false)
                     .build();
 
-            given(categoryPortOut.getAll(pageRequest)).willReturn(categoryPage);
+            given(categoryPortOut.searchCategories(filter, pageRequest)).willReturn(categoryPage);
 
-            var result = categoryUseCase.getAll(pageRequest);
+            var result = categoryUseCase.searchCategories(filter, pageRequest);
 
             assertThat(result).isNotNull();
             assertThat(result).isEqualTo(categoryPage);
-            then(categoryPortOut).should().getAll(pageRequest);
-        }
-    }
-
-    @Nested
-    @DisplayName("getByName() tests")
-    class GetByNameTests {
-
-        @Test
-        @DisplayName("Should delegate to portOut and return a filtered page of categories")
-        void shouldDelegateGetByName() {
-            String name = "Elec";
-            var categoryPage = Page.<Category>builder().data(List.of(category)).build();
-
-            given(categoryPortOut.getByName(name, pageRequest)).willReturn(categoryPage);
-
-            var result = categoryUseCase.getByName(name, pageRequest);
-
-            assertThat(result).isEqualTo(categoryPage);
-            then(categoryPortOut).should().getByName(name, pageRequest);
+            then(categoryPortOut).should().searchCategories(filter, pageRequest);
         }
     }
 

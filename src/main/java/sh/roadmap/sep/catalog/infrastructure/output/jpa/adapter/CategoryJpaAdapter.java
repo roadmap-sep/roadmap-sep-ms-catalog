@@ -1,17 +1,22 @@
 package sh.roadmap.sep.catalog.infrastructure.output.jpa.adapter;
 
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import sh.roadmap.sep.catalog.domain.exception.CategoryAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.exception.CategoryNotFoundException;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.port.out.CategoryPortOut;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.entity.CategoryEntity;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.mapper.CategoryJpaMapper;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.repository.CategoryJpaRepository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -20,14 +25,8 @@ public class CategoryJpaAdapter implements CategoryPortOut {
     private final CategoryJpaMapper categoryJpaMapper;
 
     @Override
-    public Page<Category> getAll(Page.Request pageRequest) {
-        return this.toCategoryPage(categoryJpaRepository.findAll(PageRequest.of(pageRequest.pageNumber(),
-                pageRequest.pageSize())));
-    }
-
-    @Override
-    public Page<Category> getByName(String name, Page.Request pageRequest) {
-        return this.toCategoryPage(categoryJpaRepository.findByNameContainingIgnoreCase(name,
+    public Page<Category> searchCategories(CategoryFilter categoryFilter, Page.Request pageRequest) {
+        return this.toCategoryPage(categoryJpaRepository.findAll(getDynamicFilters(categoryFilter),
                 PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize())));
     }
 
@@ -63,21 +62,38 @@ public class CategoryJpaAdapter implements CategoryPortOut {
     }
 
     private Page<Category> toCategoryPage(org.springframework.data.domain.Page<CategoryEntity> page) {
-        int pageNumber = page.getNumber();
-        int pageSize = page.getSize();
-        long totalElements = page.getTotalElements();
-        int totalPages = page.getTotalPages();
-        boolean hasNextPage = page.hasNext();
+        Page.PageBuilder<Category> builder = Page.<Category>builder()
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .hasNext(page.hasNext());
         return page.get()
                 .map(categoryJpaMapper::toModel)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), categories ->
-                        Page.<Category>builder()
-                                .data(categories)
-                                .pageNumber(pageNumber)
-                                .pageSize(pageSize)
-                                .totalElements(totalElements)
-                                .totalPages(totalPages)
-                                .hasNext(hasNextPage)
-                                .build()));
+                .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
+                .build();
+    }
+
+    private Specification<CategoryEntity> getDynamicFilters(CategoryFilter filter) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (filter.name() != null && !filter.name().isBlank()) {
+                predicates.add(cb.like(cb.lower(root.get("name")), "%" + filter.name().toLowerCase() + "%"));
+            }
+
+            if (filter.slug() != null && !filter.slug().isBlank()) {
+                predicates.add(cb.equal(root.get("slug"), filter.slug()));
+            }
+
+            if (filter.parentId() != null) {
+                predicates.add(cb.equal(root.get("parentId"), filter.parentId()));
+            }
+
+            if (filter.isActive() != null) {
+                predicates.add(cb.equal(root.get("active"), filter.isActive()));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
     }
 }

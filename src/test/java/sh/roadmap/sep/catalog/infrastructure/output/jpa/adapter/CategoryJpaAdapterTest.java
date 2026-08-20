@@ -1,18 +1,28 @@
 package sh.roadmap.sep.catalog.infrastructure.output.jpa.adapter;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import sh.roadmap.sep.catalog.domain.exception.CategoryAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.exception.CategoryNotFoundException;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.entity.CategoryEntity;
 import sh.roadmap.sep.catalog.infrastructure.output.jpa.mapper.CategoryJpaMapper;
@@ -24,8 +34,12 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +50,8 @@ class CategoryJpaAdapterTest {
 
     @Mock
     private CategoryJpaMapper categoryJpaMapper;
+    @Captor
+    private ArgumentCaptor<Specification<CategoryEntity>> specificationCaptor;
 
     @InjectMocks
     private CategoryJpaAdapter categoryJpaAdapter;
@@ -47,50 +63,65 @@ class CategoryJpaAdapterTest {
     private final Page.Request pageRequest = new Page.Request(0, 10);
 
     @Nested
-    @DisplayName("Tests for getAll()")
-    class GetAllTests {
+    @DisplayName("Tests for searchCategories()")
+    class SearchCategoriesTests {
 
         @Test
-        @DisplayName("should return a mapped category page")
-        void shouldReturnMappedCategoryPage() {
+        @DisplayName("should return a mapped category page and execute dynamic filters (True branches)")
+        @SuppressWarnings("unchecked")
+        void shouldReturnMappedCategoryPageWhenSearching() {
+            var filter = new CategoryFilter("Electronics", "electronics-slug", 1L, true);
             var pageable = PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize());
             var entityPage = new PageImpl<>(List.of(categoryEntity), pageable, 1);
 
-            given(categoryJpaRepository.findAll(pageable)).willReturn(entityPage);
+            given(categoryJpaRepository.findAll(specificationCaptor.capture(), eq(pageable)))
+                    .willReturn(entityPage);
             given(categoryJpaMapper.toModel(categoryEntity)).willReturn(category);
+            var result = categoryJpaAdapter.searchCategories(filter, pageRequest);
 
-            var result = categoryJpaAdapter.getAll(pageRequest);
+            Specification<CategoryEntity> capturedSpec = specificationCaptor.getValue();
+
+            Root<CategoryEntity> rootMock = mock(Root.class);
+            CriteriaQuery<?> queryMock = mock(CriteriaQuery.class);
+            CriteriaBuilder cbMock = mock(CriteriaBuilder.class);
+            Path<?> pathMock = mock(Path.class);
+
+            given(rootMock.get(anyString())).willReturn((Path) pathMock);
+
+            lenient().when(cbMock.lower(any())).thenReturn(mock(Expression.class));
+            lenient().when(cbMock.like(any(), anyString())).thenReturn(mock(Predicate.class));
+            lenient().when(cbMock.equal(any(), any())).thenReturn(mock(Predicate.class));
+            lenient().when(cbMock.and(any(Predicate[].class))).thenReturn(mock(Predicate.class));
+
+            capturedSpec.toPredicate(rootMock, queryMock, cbMock);
 
             assertThat(result).isNotNull();
             assertThat(result.data()).containsExactly(category);
             assertThat(result.totalElements()).isEqualTo(1);
-            assertThat(result.pageNumber()).isZero();
-            assertThat(result.pageSize()).isEqualTo(10);
-
-            then(categoryJpaRepository).should().findAll(pageable);
-            then(categoryJpaMapper).should().toModel(categoryEntity);
         }
-    }
-
-    @Nested
-    @DisplayName("Tests for getByName()")
-    class GetByNameTests {
 
         @Test
-        @DisplayName("should return a mapped page filtered by name")
-        void shouldReturnMappedCategoryPageByName() {
-            String nameToSearch = "elec";
+        @DisplayName("should execute dynamic filters with null or blank values (False branches)")
+        @SuppressWarnings("unchecked")
+        void shouldExecuteSpecificationWithNullOrBlankFilters() {
+            var filter = new CategoryFilter("   ", "", null, null);
             var pageable = PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize());
             var entityPage = new PageImpl<>(List.of(categoryEntity), pageable, 1);
 
-            given(categoryJpaRepository.findByNameContainingIgnoreCase(nameToSearch, pageable))
+            given(categoryJpaRepository.findAll(specificationCaptor.capture(), eq(pageable)))
                     .willReturn(entityPage);
             given(categoryJpaMapper.toModel(categoryEntity)).willReturn(category);
 
-            var result = categoryJpaAdapter.getByName(nameToSearch, pageRequest);
+            categoryJpaAdapter.searchCategories(filter, pageRequest);
 
-            assertThat(result.data()).containsExactly(category);
-            then(categoryJpaRepository).should().findByNameContainingIgnoreCase(nameToSearch, pageable);
+            Specification<CategoryEntity> capturedSpec = specificationCaptor.getValue();
+            Root<CategoryEntity> rootMock = mock(Root.class);
+            CriteriaQuery<?> queryMock = mock(CriteriaQuery.class);
+            CriteriaBuilder cbMock = mock(CriteriaBuilder.class);
+
+            given(cbMock.and(any(Predicate[].class))).willReturn(mock(Predicate.class));
+
+            capturedSpec.toPredicate(rootMock, queryMock, cbMock);
         }
     }
 

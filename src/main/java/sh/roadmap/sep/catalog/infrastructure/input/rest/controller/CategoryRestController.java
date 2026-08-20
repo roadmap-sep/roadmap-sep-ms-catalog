@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.util.Page;
 
 @RestController
@@ -25,21 +26,15 @@ public class CategoryRestController {
     private final CategoryService categoryService;
 
     @GetMapping(version = "1.0")
-    public ResponseEntity<Page<CategoryResponse>> getAll(@RequestParam(name = "page", defaultValue = "0")
-                                                            int page,
-                                                         @RequestParam(name = "size", defaultValue = "10")
-                                                            int size) {
-        return ResponseEntity.ok(categoryService.getAll(new Page.Request(page, size)));
-    }
-
-    @GetMapping(version = "1.0", params = "category_name")
-    public ResponseEntity<Page<CategoryResponse>> getByName(@RequestParam(name = "category_name")
-                                                               String categoryName,
-                                                            @RequestParam(name = "page", defaultValue = "0")
-                                                               int page,
-                                                            @RequestParam(name = "size", defaultValue = "10")
-                                                               int size) {
-        return ResponseEntity.ok(categoryService.getByName(categoryName, new Page.Request(page, size)));
+    public ResponseEntity<Page<CategoryResponse>> getAll(
+            @RequestParam(name = "name", required = false) String name,
+            @RequestParam(name = "slug", required = false) String slug,
+            @RequestParam(name = "parent_id", required = false) Long parentId,
+            @RequestParam(name = "is_active", defaultValue = "true") Boolean isActive,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        return ResponseEntity.ok(categoryService.searchCategories(new CategoryFilter(name, slug, parentId, isActive),
+                new Page.Request(page, size)));
     }
 
     @GetMapping(value = "/{category_id}", version = "1.0")

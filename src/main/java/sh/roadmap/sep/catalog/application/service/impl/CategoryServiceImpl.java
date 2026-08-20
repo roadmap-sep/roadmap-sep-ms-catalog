@@ -8,6 +8,7 @@ import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
 import sh.roadmap.sep.catalog.application.mapper.CategoryDtoMapper;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
 import sh.roadmap.sep.catalog.domain.model.Category;
+import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
 import sh.roadmap.sep.catalog.domain.port.in.CategoryPortIn;
 import sh.roadmap.sep.catalog.domain.util.Page;
 
@@ -22,13 +23,8 @@ public class CategoryServiceImpl implements CategoryService {
     private final CategoryDtoMapper categoryDtoMapper;
 
     @Override
-    public Page<CategoryResponse> getAll(Page.Request pageRequest) {
-        return categoryDtoMapper.toDto(categoryPortIn.getAll(pageRequest));
-    }
-
-    @Override
-    public Page<CategoryResponse> getByName(String name, Page.Request pageRequest) {
-        return categoryDtoMapper.toDto(categoryPortIn.getByName(name, pageRequest));
+    public Page<CategoryResponse> searchCategories(CategoryFilter categoryFilter, Page.Request pageRequest) {
+        return categoryDtoMapper.toDto(categoryPortIn.searchCategories(categoryFilter, pageRequest));
     }
 
     @Override
