@@ -10,6 +10,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
+import sh.roadmap.sep.catalog.application.exception.CategoryServiceException;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
 import sh.roadmap.sep.catalog.domain.exception.CategoryNotFoundException;
 import sh.roadmap.sep.catalog.domain.exception.ProductAlreadyExistsException;
@@ -263,6 +264,23 @@ class CategoryRestControllerTest {
                     .andExpect(status().isBadRequest());
 
             then(categoryService).should(never()).update(any(), eq(categoryId));
+        }
+
+        @Test
+        @DisplayName("Should throw CategoryServiceException if parentId equals categoryId")
+        void shouldThrowExceptionWhenSelfParenting() throws Exception {
+            long categoryId = 1L;
+            var invalidRequest = new CategoryRequest("electronics", "electronics", categoryId);
+
+            doThrow(new CategoryServiceException(""))
+                    .when(categoryService).update(any(CategoryRequest.class), eq(categoryId));
+
+            mockMvc.perform(put(BASE_URL + "/{category_id}", categoryId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isUnprocessableContent())
+                    .andExpect(jsonPath("$.detail").exists());
+
         }
     }
 

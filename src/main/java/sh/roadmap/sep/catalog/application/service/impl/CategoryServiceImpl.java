@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
+import sh.roadmap.sep.catalog.application.exception.CategoryServiceException;
 import sh.roadmap.sep.catalog.application.mapper.CategoryDtoMapper;
 import sh.roadmap.sep.catalog.application.service.CategoryService;
 import sh.roadmap.sep.catalog.domain.model.Category;
@@ -56,7 +57,7 @@ public class CategoryServiceImpl implements CategoryService {
         Long parentId = categoryRequest.parentId();
         if (parentId != null) {
             if (parentId == categoryId) {
-                throw new IllegalArgumentException("Una categoría no puede ser padre de sí misma");
+                throw new CategoryServiceException("A category cannot be the parent of itself.");
             }
             categoryPortIn.getById(parentId);
         }
