@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import sh.roadmap.sep.catalog.application.dto.request.CategoryRequest;
 import sh.roadmap.sep.catalog.application.dto.response.CategoryResponse;
+import sh.roadmap.sep.catalog.application.exception.CategoryServiceException;
 import sh.roadmap.sep.catalog.application.mapper.CategoryDtoMapper;
 import sh.roadmap.sep.catalog.domain.model.Category;
 import sh.roadmap.sep.catalog.domain.model.CategoryFilter;
@@ -180,15 +181,15 @@ class CategoryServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should throw IllegalArgumentException if parentId equals categoryId")
+        @DisplayName("Should throw CategoryServiceException if parentId equals categoryId")
         void shouldThrowExceptionWhenSelfParenting() {
             long categoryId = 1L;
             var request = new CategoryRequest("Name", "slug", categoryId); // parentId = categoryId
             given(categoryPortIn.getById(categoryId)).willReturn(category);
 
             assertThatThrownBy(() -> categoryService.update(request, categoryId))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessage("Una categoría no puede ser padre de sí misma");
+                    .isInstanceOf(CategoryServiceException.class)
+                    .hasMessage("A category cannot be the parent of itself.");
 
             then(categoryPortIn).should(never()).update(any(Category.class));
         }

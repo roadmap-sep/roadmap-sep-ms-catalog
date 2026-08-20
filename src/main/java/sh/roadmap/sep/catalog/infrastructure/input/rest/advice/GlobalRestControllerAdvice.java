@@ -11,6 +11,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import sh.roadmap.sep.catalog.application.exception.CategoryServiceException;
 import sh.roadmap.sep.catalog.application.exception.ProductImportException;
 import sh.roadmap.sep.catalog.application.exception.ProductImportStrategyException;
 import sh.roadmap.sep.catalog.domain.exception.CategoryAlreadyExistsException;
@@ -83,6 +84,11 @@ public class GlobalRestControllerAdvice {
         String msg = String.format("Version %s is not available. Supported versions: %s.",
                 exception.getVersion(), apiVersionSupported);
         return buildResponse(msg, exception, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(CategoryServiceException.class)
+    public ResponseEntity<ErrorResponse> categoryServiceException(CategoryServiceException exception) {
+        return buildResponse(exception, HttpStatus.UNPROCESSABLE_CONTENT);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(Exception exception, HttpStatus status) {
