@@ -48,13 +48,13 @@ jobs:
       # 7. Compilar, ejecutar tests, cobertura y verificación de umbrales (CON LAS VARIABLES DE ENTORNO)
       - name: Build, Test and Coverage Verification
         env:
-          DATASOURCE_URL: ${{ secrets.DATASOURCE_URL }}
-          DATASOURCE_USERNAME: ${{ secrets.DATASOURCE_USERNAME }}
+          DATASOURCE_URL: ${{ vars.DATASOURCE_URL }}
+          DATASOURCE_USERNAME: ${{ vars.DATASOURCE_USERNAME }}
           DATASOURCE_PASSWORD: ${{ secrets.DATASOURCE_PASSWORD }}
-          DATASOURCE_DRIVER: ${{ secrets.DATASOURCE_DRIVER }}
-          SPRING_JPA_HIBERNATE_DDL_AUTO: ${{ secrets.SPRING_JPA_HIBERNATE_DDL_AUTO }}
-          MULTIPART_MAX_FILE_SIZE: "2MB"
-          MULTIPART_MAX_REQUEST_SIZE: "2MB"
+          DATASOURCE_DRIVER: ${{ vars.DATASOURCE_DRIVER }}
+          SPRING_JPA_HIBERNATE_DDL_AUTO: ${{ vars.SPRING_JPA_HIBERNATE_DDL_AUTO }}
+          MULTIPART_MAX_FILE_SIZE: ${{ vars.MULTIPART_MAX_FILE_SIZE }}
+          MULTIPART_MAX_REQUEST_SIZE: ${{ vars.MULTIPART_MAX_REQUEST_SIZE }}
         run: ./gradlew build check --no-daemon
 
       # 8. Subir el reporte de cobertura de JaCoCo
