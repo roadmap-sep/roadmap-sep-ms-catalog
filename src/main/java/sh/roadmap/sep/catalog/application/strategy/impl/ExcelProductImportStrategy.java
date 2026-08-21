@@ -7,9 +7,10 @@ import com.alibaba.excel.read.listener.ReadListener;
 import com.alibaba.excel.support.ExcelTypeEnum;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import sh.roadmap.sep.catalog.application.dto.request.ProductImportRequest;
@@ -86,7 +87,8 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
         return productsDto;
     }
 
-    @Data
+    @Getter
+    @Setter
     @NoArgsConstructor
     public static class ProductExcelDto {
         @ExcelProperty(index = 0)
@@ -130,7 +132,7 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
             Set<Long> categorySet = new HashSet<>();
             if (data.getCategories() != null && !data.getCategories().isBlank()) {
                 try {
-                    categorySet = Arrays.stream(data.getCategories().split(","))
+                    categorySet = Arrays.stream(data.getCategories().split("\\D+"))
                             .map(String::trim)
                             .map(Long::parseLong)
                             .collect(Collectors.toSet());
