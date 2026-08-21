@@ -33,6 +33,16 @@ dependencies {
     //implementation 'com.opencsv:opencsv:5.12.0'
     implementation 'com.alibaba:easyexcel:4.0.3'
     implementation 'org.odftoolkit:odfdom-java:0.13.0'
+    constraints {
+        implementation('org.bouncycastle:bcprov-jdk18on') {
+            version { strictly '1.84' }
+            because 'Mitigación de la vulnerabilidad CVE-2026-0636'
+        }
+        implementation('org.bouncycastle:bcpkix-jdk18on') {
+            version { strictly '1.84' }
+            because 'Mitigación de la vulnerabilidad CVE-2026-0636'
+        }
+    }
     implementation 'org.mapstruct:mapstruct:1.6.3'
     compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
@@ -57,6 +67,7 @@ dependencyManagement {
 configurations.configureEach {
     resolutionStrategy {
         force 'org.apache.poi:poi:5.4.0', 'org.apache.poi:poi-ooxml:5.4.0'
+        force 'org.bouncycastle:bcprov-jdk18on:1.84', 'org.bouncycastle:bcpkix-jdk18on:1.84'
     }
 }
 tasks.named('test') {

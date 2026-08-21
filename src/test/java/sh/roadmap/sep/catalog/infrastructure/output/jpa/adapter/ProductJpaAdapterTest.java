@@ -269,22 +269,23 @@ class ProductJpaAdapterTest {
         }
 
         @Test
-        @DisplayName("Should map batch DataIntegrityViolationException to ProductImportException")
+        @DisplayName("Should check for existing SKUs first and throw ProductImportException without inserting")
         @SuppressWarnings("unchecked")
         void shouldHandleDuplicateSkuInBatchAndThrow() {
             List<Product> products = List.of(product);
+            String duplicateSku = product.sku();
 
-            SQLException sqlException = new SQLException("duplicate key violates unique constraint 'sku'");
-            DataIntegrityViolationException dbException = new DataIntegrityViolationException("Error", sqlException);
-
-            given(jdbcTemplate.batchUpdate(anyString(), any(BatchPreparedStatementSetter.class)))
-                    .willThrow(dbException);
-
-            given(jdbcTemplate.query(any(PreparedStatementCreator.class), any(RowMapper.class)))
-                    .willReturn(List.of(sku));
+            given(jdbcTemplate.query(any(org.springframework.jdbc.core.PreparedStatementCreator.class),
+                    any(org.springframework.jdbc.core.RowMapper.class)))
+                    .willReturn(List.of(duplicateSku));
 
             assertThatThrownBy(() -> productJpaAdapter.saveBatch(products))
-                    .isInstanceOf(ProductImportException.class);
+                    .isInstanceOf(ProductImportException.class)
+                    .hasMessageContaining(duplicateSku);
+
+            then(jdbcTemplate).should(never()).batchUpdate(anyString(),
+                    any(org.springframework.jdbc.core.BatchPreparedStatementSetter.class));
+            then(jdbcTemplate).should(never()).batchUpdate(anyString(), any(List.class));
         }
     }
 

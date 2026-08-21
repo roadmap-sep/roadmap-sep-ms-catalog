@@ -78,11 +78,11 @@ public class ProductJpaAdapter implements ProductPortOut {
         if (products == null || products.isEmpty()) {
             return;
         }
-        try {
-            insertProducts(products);
-        } catch (DataIntegrityViolationException e) {
-            handleDuplicateSkuAndThrow(products, e);
+        List<String> existingSkus = findExistingSkus(products);
+        if (!existingSkus.isEmpty()) {
+            throw new ProductImportException(existingSkus);
         }
+        insertProducts(products);
         insertCategoryRelations(products);
     }
 
@@ -166,21 +166,16 @@ public class ProductJpaAdapter implements ProductPortOut {
         });
     }
 
-    private void handleDuplicateSkuAndThrow(List<Product> products, DataIntegrityViolationException e) {
-        if (e.getMostSpecificCause().getMessage().contains("sku")) {
-            MapSqlParameterSource parameters = products.stream()
-                    .map(Product::sku)
-                    .collect(Collectors.collectingAndThen(Collectors.toList(),
-                            incomingSkus -> new MapSqlParameterSource("skus", incomingSkus)));
+    private List<String> findExistingSkus(List<Product> products) {
+        MapSqlParameterSource parameters = products.stream()
+                .map(Product::sku)
+                .collect(Collectors.collectingAndThen(Collectors.toList(),
+                        incomingSkus -> new MapSqlParameterSource("skus", incomingSkus)));
 
-            String sqlCheck = "SELECT sku FROM product WHERE sku IN (:skus)";
+        String sqlCheck = "SELECT sku FROM product WHERE sku IN (:skus)";
 
-            throw new NamedParameterJdbcTemplate(jdbcTemplate)
-                    .queryForList(sqlCheck, parameters, String.class)
-                    .stream()
-                    .collect(Collectors.collectingAndThen(Collectors.toList(), ProductImportException::new));
-        }
-        throw e;
+        return new NamedParameterJdbcTemplate(jdbcTemplate)
+                .queryForList(sqlCheck, parameters, String.class);
     }
 
     private void insertCategoryRelations(List<Product> products) {

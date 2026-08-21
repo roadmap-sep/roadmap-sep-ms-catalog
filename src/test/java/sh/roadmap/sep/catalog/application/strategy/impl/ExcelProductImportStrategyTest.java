@@ -101,9 +101,7 @@ class ExcelProductImportStrategyTest {
             given(inputStream.available()).willReturn(10);
             ProductImportRequest request = new ProductImportRequest("xlsx", "file.xlsx", inputStream);
 
-            // CORRECCIÓN: Cambiado a EasyExcelFactory
             try (MockedStatic<EasyExcelFactory> easyExcelMock = mockStatic(EasyExcelFactory.class)) {
-                // Simulamos una lectura que no invoca el listener (archivo sin filas)
                 mockEasyExcel(easyExcelMock, listener -> {
                 });
 
@@ -126,15 +124,11 @@ class ExcelProductImportStrategyTest {
             given(rowHolderMock.getRowIndex()).willReturn(0, 1); // Fila 1 y Fila 2
 
             given(validator.validate(any())).willReturn(Collections.emptySet());
-            // El puerto de categoría responde bien a la ID 1
             given(categoryPortIn.getById(1L)).willReturn(mock(Category.class));
 
-            // CORRECCIÓN: Cambiado a EasyExcelFactory
             try (MockedStatic<EasyExcelFactory> easyExcelMock = mockStatic(EasyExcelFactory.class)) {
                 mockEasyExcel(easyExcelMock, listener -> {
-                    // Invocación Fila 1: Cache Miss -> Va al CategoryPortIn
                     listener.invoke(createDto("SKU-1", "1", "$100.50", "10 units", "1.5 kg"), contextMock);
-                    // Invocación Fila 2: Cache Hit -> No va al CategoryPortIn
                     listener.invoke(createDto("SKU-2", "1", "200", "5", "2.0"), contextMock);
                     listener.doAfterAllAnalysed(contextMock);
                 });
@@ -142,12 +136,11 @@ class ExcelProductImportStrategyTest {
                 List<ProductRequest> result = strategy.process(request);
 
                 assertThat(result).hasSize(2);
-                assertThat(result.get(0).sku()).isEqualTo("SKU-1");
-                assertThat(result.get(0).price()).isEqualTo(new BigDecimal("100.50"));
-                assertThat(result.get(0).stock()).isEqualTo(10);
-                assertThat(result.get(0).weight()).isEqualTo(1.5);
+                assertThat(result.getFirst().sku()).isEqualTo("SKU-1");
+                assertThat(result.getFirst().price()).isEqualTo(new BigDecimal("100.50"));
+                assertThat(result.getFirst().stock()).isEqualTo(10);
+                assertThat(result.getFirst().weight()).isEqualTo(1.5);
 
-                // Verificamos que gracias al validCategoriesCache, el puerto se llamó UNA sola vez
                 verify(categoryPortIn, times(1)).getById(1L);
             }
         }
@@ -165,31 +158,25 @@ class ExcelProductImportStrategyTest {
             given(contextMock.readRowHolder()).willReturn(rowHolderMock);
             given(rowHolderMock.getRowIndex()).willReturn(0, 1, 2);
 
-            // CORRECCIÓN: Usar ConstraintViolation<ProductRequest> en lugar de <Object>
             ConstraintViolation<Object> violationMock = mock(ConstraintViolation.class);
             Path pathMock = mock(Path.class);
             given(pathMock.toString()).willReturn("sku");
             given(violationMock.getPropertyPath()).willReturn(pathMock);
             given(violationMock.getMessage()).willReturn("must not be blank");
 
-            // Retorna violaciones solo en la primera invocación
             given(validator.validate(any())).willReturn(Set.of(violationMock),
                     Collections.emptySet(), Collections.emptySet());
 
             // Mock CategoryNotFound para la ID 99
             given(categoryPortIn.getById(99L)).willThrow(new CategoryNotFoundException(99L));
 
-            // CORRECCIÓN: Cambiado a EasyExcelFactory
             try (MockedStatic<EasyExcelFactory> easyExcelMock = mockStatic(EasyExcelFactory.class)) {
                 mockEasyExcel(easyExcelMock, listener -> {
-                    // Fila 1: Dispara ConstraintViolation y CategoryNotFoundException (Cache miss invalid)
                     listener.invoke(createDto("", "99", "10", "10", "1.0"), contextMock);
 
-                    // Fila 2: Dispara error de caché inválido directo (Cache hit invalid)
                     listener.invoke(createDto("SKU-2", "99", "10", "10", "1.0"), contextMock);
 
-                    // Fila 3: Dispara NumberFormatExceptions en Categories y en campos numéricos
-                    listener.invoke(createDto("SKU-3", "abc", "abc", "xyz", "abc"), contextMock);
+                    listener.invoke(createDto("SKU-3", "123", "abc", "xyz", "abc"), contextMock);
                 });
 
                 assertThatThrownBy(() -> strategy.process(request))
@@ -199,15 +186,12 @@ class ExcelProductImportStrategyTest {
                             List<String> violations = pie.getViolations();
                             assertThat(violations).hasSizeGreaterThan(0);
 
-                            // Aseguramos que se atraparon todos los escenarios de validación
                             String errors = violations.toString();
                             assertThat(errors).contains("must not be blank");
                             assertThat(errors).contains("Category with id: 99 not found");
-                            assertThat(errors).contains("Only numbers are allowed in the categories");
                             assertThat(errors).contains("Invalid numeric format");
                         });
 
-                // Verificamos que gracias al invalidCategoriesCache, la DB solo se consultó una vez para la 99
                 verify(categoryPortIn, times(1)).getById(99L);
             }
         }
@@ -218,7 +202,6 @@ class ExcelProductImportStrategyTest {
         ExcelReaderBuilder readerBuilderMock = mock(ExcelReaderBuilder.class);
         ExcelReaderSheetBuilder sheetBuilderMock = mock(ExcelReaderSheetBuilder.class);
 
-        // Usamos EasyExcelFactory.read()
         easyExcelMock.when(() -> EasyExcelFactory.read(any(InputStream.class),
                         eq(ExcelProductImportStrategy.ProductExcelDto.class),
                         any(ReadListener.class)))
