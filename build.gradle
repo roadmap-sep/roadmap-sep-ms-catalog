@@ -92,7 +92,7 @@ def jacocoExcludes = [
         'sh/roadmap/sep/catalog/infrastructure/configuration/**',
         'sh/roadmap/sep/catalog/infrastructure/output/jpa/entity/**',
         'sh/roadmap/sep/catalog/infrastructure/output/jpa/mapper/**',
-        'sh/roadmap/sep/catalog/CatalogServiceApplication.class'
+        'sh/roadmap/sep/catalog/CatalogServiceApplication.*'
 ]
 jacocoTestReport {
     dependsOn tasks.named('test')

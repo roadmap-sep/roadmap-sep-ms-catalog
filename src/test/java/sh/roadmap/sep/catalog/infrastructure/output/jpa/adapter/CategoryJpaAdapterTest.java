@@ -40,7 +40,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryJpaAdapterTest {
@@ -50,6 +49,10 @@ class CategoryJpaAdapterTest {
 
     @Mock
     private CategoryJpaMapper categoryJpaMapper;
+
+    @Captor
+    private ArgumentCaptor<CategoryEntity> categoryEntityCaptor;
+
     @Captor
     private ArgumentCaptor<Specification<CategoryEntity>> specificationCaptor;
 
@@ -174,7 +177,7 @@ class CategoryJpaAdapterTest {
         void shouldThrowExceptionWhenIdViolatesIntegrity() {
             given(categoryJpaMapper.toEntity(category)).willReturn(categoryEntity);
 
-            var cause = new RuntimeException("duplicate key value violates unique constraint on id");
+            var cause = new RuntimeException("duplicate key value violates unique constraint on primary");
             var exception = new DataIntegrityViolationException("DB Error", cause);
 
             given(categoryJpaRepository.save(categoryEntity)).willThrow(exception);
@@ -188,7 +191,7 @@ class CategoryJpaAdapterTest {
         void shouldThrowExceptionWhenSlugViolatesIntegrity() {
             given(categoryJpaMapper.toEntity(category)).willReturn(categoryEntity);
 
-            var cause = new RuntimeException("duplicate key value violates unique constraint on slug");
+            var cause = new RuntimeException("duplicate key value violates unique constraint on uk_category_slug");
             var exception = new DataIntegrityViolationException("DB Error", cause);
 
             given(categoryJpaRepository.save(categoryEntity)).willThrow(exception);
@@ -217,27 +220,15 @@ class CategoryJpaAdapterTest {
     class UpdateTests {
 
         @Test
-        @DisplayName("You must update if the category exists")
-        void shouldUpdateCategoryWhenExists() {
-            given(categoryJpaRepository.existsById(category.id())).willReturn(true);
+        @DisplayName("Should mark entity as not new and save")
+        void shouldUpdateProductSuccessfully() {
             given(categoryJpaMapper.toEntity(category)).willReturn(categoryEntity);
 
             categoryJpaAdapter.update(category);
-
-            then(categoryJpaRepository).should().save(categoryEntity);
+            then(categoryJpaRepository).should().save(categoryEntityCaptor.capture());
+            CategoryEntity capturedEntity = categoryEntityCaptor.getValue();
+            assertThat(capturedEntity.isNew()).isFalse();
         }
 
-        @Test
-        @DisplayName("It should throw CategoryNotFoundException if an update "
-                + "attempt is made and the CategoryNotFoundException does not exist.")
-        void shouldThrowExceptionWhenUpdatingNonExistentCategory() {
-            given(categoryJpaRepository.existsById(category.id())).willReturn(false);
-
-            assertThatThrownBy(() -> categoryJpaAdapter.update(category))
-                    .isInstanceOf(CategoryNotFoundException.class);
-
-            then(categoryJpaRepository).should(never()).save(any());
-            then(categoryJpaMapper).shouldHaveNoInteractions();
-        }
     }
 }

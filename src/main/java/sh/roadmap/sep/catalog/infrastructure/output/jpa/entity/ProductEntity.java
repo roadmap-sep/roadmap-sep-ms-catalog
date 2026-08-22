@@ -11,6 +11,7 @@ import jakarta.persistence.PostLoad;
 import jakarta.persistence.PostPersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -29,18 +30,18 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@Table(name = "product")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(name = "product", uniqueConstraints = {@UniqueConstraint(name = "uk_product_sku", columnNames = "sku")})
 public class ProductEntity implements Persistable<UUID> {
     @Id
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String sku;
 
     @Column(nullable = false)
