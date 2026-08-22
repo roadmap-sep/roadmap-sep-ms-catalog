@@ -195,7 +195,7 @@ class ProductJpaAdapterTest {
         void shouldThrowAlreadyExistsForSku() {
             given(productJpaMapper.toEntity(product)).willReturn(productEntity);
 
-            SQLException sqlException = new SQLException("duplicate key violates unique constraint 'sku'");
+            SQLException sqlException = new SQLException("duplicate key violates unique constraint 'uk_product_sku'");
             DataIntegrityViolationException dbException = new DataIntegrityViolationException("Error", sqlException);
 
             given(productJpaRepository.saveAndFlush(productEntity)).willThrow(dbException);
@@ -210,7 +210,7 @@ class ProductJpaAdapterTest {
         void shouldThrowAlreadyExistsForId() {
             given(productJpaMapper.toEntity(product)).willReturn(productEntity);
 
-            SQLException sqlException = new SQLException("duplicate key violates unique constraint 'id'");
+            SQLException sqlException = new SQLException("duplicate key violates unique constraint 'PRIMARY'");
             DataIntegrityViolationException dbException = new DataIntegrityViolationException("Error", sqlException);
 
             given(productJpaRepository.saveAndFlush(productEntity)).willThrow(dbException);

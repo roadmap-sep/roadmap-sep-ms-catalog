@@ -7,6 +7,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -14,11 +15,11 @@ import lombok.Setter;
 import org.springframework.data.domain.Persistable;
 
 @Entity
-@Table(name = "category")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Table(name = "category", uniqueConstraints = {@UniqueConstraint(name = "uk_category_slug", columnNames = "slug")})
 public class CategoryEntity implements Persistable<Long> {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -27,7 +28,7 @@ public class CategoryEntity implements Persistable<Long> {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 150)
+    @Column(nullable = false, length = 150)
     private String slug;
 
     @Column(name = "parent_id")

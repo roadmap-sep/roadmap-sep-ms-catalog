@@ -26,20 +26,31 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class ProductJpaAdapter implements ProductPortOut {
+    private static final Map<String, Function<Product, RuntimeException>> CONSTRAINT_ERROR_MAP;
     private final ProductJpaRepository productJpaRepository;
     private final ProductJpaMapper productJpaMapper;
     private final JdbcTemplate jdbcTemplate;
 
+    static {
+        CONSTRAINT_ERROR_MAP = Map.of(
+                "primary", product -> new ProductAlreadyExistsException(product.id()),
+                "uk_product_sku", product -> new ProductAlreadyExistsException(product.sku())
+        );
+    }
+
     @Override
     public Page<Product> searchProducts(ProductFilter productFilter, Page.Request pageRequest) {
-        return this.toProductPage(productJpaRepository.findAll(getDynamicFilters(productFilter),
-                PageRequest.of(pageRequest.pageNumber(),
-                        pageRequest.pageSize())));
+        return buildSpecification()
+                .andThen(fetchPage(pageRequest))
+                .andThen(mapToDomainPage())
+                .apply(productFilter);
     }
 
     @Override
@@ -61,15 +72,7 @@ public class ProductJpaAdapter implements ProductPortOut {
         try {
             productJpaRepository.saveAndFlush(productJpaMapper.toEntity(product));
         } catch (DataIntegrityViolationException e) {
-            String dbMessage = e.getMostSpecificCause().getMessage();
-
-            if (dbMessage.contains("sku")) {
-                throw new ProductAlreadyExistsException(product.sku());
-            }
-            if (dbMessage.contains("id")) {
-                throw new ProductAlreadyExistsException(product.id());
-            }
-            throw e;
+            handleDataIntegrityViolation(e, product);
         }
     }
 
@@ -96,22 +99,30 @@ public class ProductJpaAdapter implements ProductPortOut {
         productJpaRepository.save(productEntity);
     }
 
-    private Page<Product> toProductPage(org.springframework.data.domain.Page<ProductEntity> page) {
-        Page.PageBuilder<Product> builder = Page.<Product>builder()
-                .pageNumber(page.getNumber())
-                .pageSize(page.getSize())
-                .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages())
-                .hasNext(page.hasNext());
-
-        return page.get()
-                .map(productJpaMapper::toDomain)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
-                .build();
+    private Function<Specification<ProductEntity>,
+            org.springframework.data.domain.Page<ProductEntity>> fetchPage(Page.Request pageRequest) {
+        return specification -> productJpaRepository.findAll(specification,
+                PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize()));
     }
 
-    private Specification<ProductEntity> getDynamicFilters(ProductFilter filter) {
-        return (root, query, cb) -> {
+    private Function<org.springframework.data.domain.Page<ProductEntity>, Page<Product>> mapToDomainPage() {
+        return page -> {
+            Page.PageBuilder<Product> builder = Page.<Product>builder()
+                    .pageNumber(page.getNumber())
+                    .pageSize(page.getSize())
+                    .totalElements(page.getTotalElements())
+                    .totalPages(page.getTotalPages())
+                    .hasNext(page.hasNext());
+
+            return page.get()
+                    .map(productJpaMapper::toDomain)
+                    .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
+                    .build();
+        };
+    }
+
+    private Function<ProductFilter, Specification<ProductEntity>> buildSpecification() {
+        return filter -> (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             if (filter.name() != null && !filter.name().isBlank()) {
                 predicates.add(cb.like(cb.lower(root.get("name")), "%" + filter.name().toLowerCase() + "%"));
@@ -197,5 +208,17 @@ public class ProductJpaAdapter implements ProductPortOut {
             String sqlCategory = "INSERT INTO product_category (product_id, category_id) VALUES (?, ?)";
             jdbcTemplate.batchUpdate(sqlCategory, productCategoryArgs);
         }
+    }
+
+    private void handleDataIntegrityViolation(DataIntegrityViolationException e, Product product) {
+        String dbMessage = e.getMostSpecificCause().getMessage().toLowerCase();
+        CONSTRAINT_ERROR_MAP.entrySet()
+                .stream()
+                .filter(entry -> dbMessage.contains(entry.getKey()))
+                .findFirst()
+                .ifPresent(entry -> {
+                    throw entry.getValue().apply(product);
+                });
+        throw e;
     }
 }

@@ -17,17 +17,29 @@ import sh.roadmap.sep.catalog.infrastructure.output.jpa.repository.CategoryJpaRe
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class CategoryJpaAdapter implements CategoryPortOut {
+    private static final Map<String, Function<Category, RuntimeException>> CONSTRAINT_ERROR_MAP;
     private final CategoryJpaRepository categoryJpaRepository;
     private final CategoryJpaMapper categoryJpaMapper;
 
+    static {
+        CONSTRAINT_ERROR_MAP = Map.of(
+                "primary", category -> new CategoryAlreadyExistsException(category.id()),
+                "uk_category_slug", category -> new CategoryAlreadyExistsException(category.slug())
+        );
+    }
+
     @Override
     public Page<Category> searchCategories(CategoryFilter categoryFilter, Page.Request pageRequest) {
-        return this.toCategoryPage(categoryJpaRepository.findAll(getDynamicFilters(categoryFilter),
-                PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize())));
+        return buildSpecification()
+                .andThen(fetchPage(pageRequest))
+                .andThen(mapToDomainPage())
+                .apply(categoryFilter);
     }
 
     @Override
@@ -42,40 +54,38 @@ public class CategoryJpaAdapter implements CategoryPortOut {
         try {
             categoryJpaRepository.save(categoryJpaMapper.toEntity(category));
         } catch (DataIntegrityViolationException e) {
-            String dbMessage = e.getMostSpecificCause().getMessage();
-            if (dbMessage.contains("id")) {
-                throw new CategoryAlreadyExistsException(category.id());
-            }
-            if (dbMessage.contains("slug")) {
-                throw new CategoryAlreadyExistsException(category.slug());
-            }
-            throw e;
+            handleDataIntegrityViolation(e, category);
         }
     }
 
     @Override
     public void update(Category category) {
-        if (!categoryJpaRepository.existsById(category.id())) {
-            throw new CategoryNotFoundException(category.id());
-        }
         categoryJpaRepository.save(categoryJpaMapper.toEntity(category));
     }
 
-    private Page<Category> toCategoryPage(org.springframework.data.domain.Page<CategoryEntity> page) {
-        Page.PageBuilder<Category> builder = Page.<Category>builder()
-                .pageNumber(page.getNumber())
-                .pageSize(page.getSize())
-                .totalElements(page.getTotalElements())
-                .totalPages(page.getTotalPages())
-                .hasNext(page.hasNext());
-        return page.get()
-                .map(categoryJpaMapper::toModel)
-                .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
-                .build();
+    private Function<Specification<CategoryEntity>,
+            org.springframework.data.domain.Page<CategoryEntity>> fetchPage(Page.Request pageRequest) {
+        return specification -> categoryJpaRepository.findAll(specification,
+                PageRequest.of(pageRequest.pageNumber(), pageRequest.pageSize()));
     }
 
-    private Specification<CategoryEntity> getDynamicFilters(CategoryFilter filter) {
-        return (root, query, cb) -> {
+    private Function<org.springframework.data.domain.Page<CategoryEntity>, Page<Category>> mapToDomainPage() {
+        return page -> {
+            Page.PageBuilder<Category> builder = Page.<Category>builder()
+                    .pageNumber(page.getNumber())
+                    .pageSize(page.getSize())
+                    .totalElements(page.getTotalElements())
+                    .totalPages(page.getTotalPages())
+                    .hasNext(page.hasNext());
+            return page.get()
+                    .map(categoryJpaMapper::toModel)
+                    .collect(Collectors.collectingAndThen(Collectors.toList(), builder::data))
+                    .build();
+        };
+    }
+
+    private Function<CategoryFilter, Specification<CategoryEntity>> buildSpecification() {
+        return filter -> (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
             if (filter.name() != null && !filter.name().isBlank()) {
@@ -95,5 +105,17 @@ public class CategoryJpaAdapter implements CategoryPortOut {
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
+    }
+
+    private void handleDataIntegrityViolation(DataIntegrityViolationException e, Category category) {
+        String dbMessage = e.getMostSpecificCause().getMessage().toLowerCase();
+        CONSTRAINT_ERROR_MAP.entrySet()
+                .stream()
+                .filter(entry -> dbMessage.contains(entry.getKey()))
+                .findFirst()
+                .ifPresent(entry -> {
+                    throw entry.getValue().apply(category);
+                });
+        throw e;
     }
 }
