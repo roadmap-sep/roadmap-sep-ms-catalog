@@ -24,12 +24,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class OdsProductImportStrategy implements ProductImportStrategy {
+    private static final Pattern CATEGORY_SPLITTER = Pattern.compile("\\D+");
     private static final String VIOLATION_MESSAGE_TEMPLATE = "Row: %s  { %s }";
     private final Validator validator;
     private final CategoryPortIn categoryPortIn;
@@ -89,7 +91,7 @@ public class OdsProductImportStrategy implements ProductImportStrategy {
                     Set<Long> categorySet = new HashSet<>();
                     if (categoriesStr != null && !categoriesStr.isBlank()) {
                         try {
-                            categorySet = Arrays.stream(categoriesStr.split("\\D+"))
+                            categorySet = Arrays.stream(CATEGORY_SPLITTER.split(categoriesStr))
                                     .map(String::trim)
                                     .map(Long::parseLong)
                                     .collect(Collectors.toSet());

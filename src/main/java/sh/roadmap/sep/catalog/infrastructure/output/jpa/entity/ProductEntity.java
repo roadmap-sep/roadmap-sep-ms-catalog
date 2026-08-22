@@ -15,6 +15,7 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
@@ -69,6 +70,7 @@ public class ProductEntity implements Persistable<UUID> {
             joinColumns = @JoinColumn(name = "product_id")
     )
     @Column(name = "category_id")
+    @BatchSize(size = 100)
     private Set<Long> categoryIds = new HashSet<>();
 
     @CreationTimestamp

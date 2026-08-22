@@ -22,8 +22,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.jdbc.core.BatchPreparedStatementSetter;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.PreparedStatementCreator;
-import org.springframework.jdbc.core.RowMapper;
 import sh.roadmap.sep.catalog.application.exception.ProductImportException;
 import sh.roadmap.sep.catalog.domain.exception.ProductAlreadyExistsException;
 import sh.roadmap.sep.catalog.domain.exception.ProductNotFoundException;
@@ -237,6 +235,15 @@ class ProductJpaAdapterTest {
         }
 
         @Test
+        @DisplayName("Should throw ProductImportException if the list is greater than 1000.")
+        void shouldThrowProductImportExceptionIfTheListIsGreaterThan1000() {
+            List<Product> productList = Collections.nCopies(1001, product);
+
+            assertThatThrownBy(() -> productJpaAdapter.saveBatch(productList))
+                    .isInstanceOf(ProductImportException.class);
+        }
+
+        @Test
         @DisplayName("Should execute two batch updates and map properties correctly in BatchPreparedStatementSetter")
         @SuppressWarnings("unchecked")
         void shouldSaveBatchSuccessfully() throws SQLException {
@@ -252,7 +259,7 @@ class ProductJpaAdapterTest {
             assertThat(capturedSetter.getBatchSize()).isEqualTo(1);
 
             PreparedStatement psMock = mock(PreparedStatement.class);
-            capturedSetter.setValues(psMock, 0); // 0 es el índice del producto en la lista
+            capturedSetter.setValues(psMock, 0);
 
             then(psMock).should().setObject(1, product.id().toString());
             then(psMock).should().setString(2, product.sku());

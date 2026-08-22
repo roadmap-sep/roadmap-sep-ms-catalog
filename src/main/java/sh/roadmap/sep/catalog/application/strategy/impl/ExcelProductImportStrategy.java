@@ -28,12 +28,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class ExcelProductImportStrategy implements ProductImportStrategy {
+    private static final Pattern CATEGORY_SPLITTER = Pattern.compile("\\D+");
     private final Validator validator;
     private final CategoryPortIn categoryPortIn;
     private static final Set<String> SUPPORTED_EXTENSIONS;
@@ -132,7 +134,7 @@ public class ExcelProductImportStrategy implements ProductImportStrategy {
             Set<Long> categorySet = new HashSet<>();
             if (data.getCategories() != null && !data.getCategories().isBlank()) {
                 try {
-                    categorySet = Arrays.stream(data.getCategories().split("\\D+"))
+                    categorySet = Arrays.stream(CATEGORY_SPLITTER.split(data.getCategories()))
                             .map(String::trim)
                             .map(Long::parseLong)
                             .collect(Collectors.toSet());

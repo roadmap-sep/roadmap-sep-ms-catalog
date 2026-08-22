@@ -10,6 +10,12 @@ public class ProductImportException extends RuntimeException {
     private static final String ERROR_MESSAGE = "Error importing the product from the %s file: %s";
     private final List<String> violations;
 
+    public ProductImportException() {
+        super(String.format(ERROR_MESSAGE, StringUtils.EMPTY,
+                "The file has more than 1000 rows."));
+        this.violations = null;
+    }
+
     public ProductImportException(List<String> violations) {
         super(String.format(ERROR_MESSAGE, StringUtils.EMPTY,
                 "The following sku list already exist: " + violations));

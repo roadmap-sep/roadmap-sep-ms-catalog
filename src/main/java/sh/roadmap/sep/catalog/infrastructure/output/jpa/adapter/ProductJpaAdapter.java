@@ -78,6 +78,9 @@ public class ProductJpaAdapter implements ProductPortOut {
         if (products == null || products.isEmpty()) {
             return;
         }
+        if (products.size() > 1000) {
+            throw new ProductImportException();
+        }
         List<String> existingSkus = findExistingSkus(products);
         if (!existingSkus.isEmpty()) {
             throw new ProductImportException(existingSkus);
